@@ -8,40 +8,28 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.client.event.ClientChatReceivedEvent;
 import org.slf4j.Logger;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Mod(WelcomeGG.MODID)
 public class WelcomeGG {
     public static final String MODID = "welcomegg";
     private static final Logger LOGGER = LogUtils.getLogger();
-    private static final File LOG_FILE = new File(Minecraft.getInstance().gameDirectory, "server_messages.log");
 
     public WelcomeGG() {
         LOGGER.info("WelcomeGG Mod initialized.");
 
         // Register event handlers
         net.neoforged.neoforge.common.NeoForge.EVENT_BUS.register(new ChatEventHandler());
-        setupLogFile();
-    }
-
-    private void setupLogFile() {
-        try {
-            if (LOG_FILE.exists() || LOG_FILE.createNewFile()) {
-                LOGGER.info("Server message log file initialized at: {}", LOG_FILE.getAbsolutePath());
-            } else {
-                LOGGER.warn("Failed to initialize server message log file.");
-            }
-        } catch (IOException e) {
-            LOGGER.error("Error creating server message log file: ", e);
-        }
     }
 
     public static class ChatEventHandler {
+
+        // Define your regex pattern
+        private static final Pattern WELCOME_PATTERN = Pattern.compile("welcome (.+) to baconetworks!");
+        private static final Pattern RANK_PATTERN = Pattern.compile("(.+) has reached the rank of (.+)!");
 
         @SubscribeEvent
         public void onChatMessage(ClientChatReceivedEvent event) {
@@ -49,17 +37,21 @@ public class WelcomeGG {
             String message = event.getMessage().getString();
             LOGGER.info("Chat event received: {}", message);
 
-            // Save the message to the log file
-            saveMessageToFile(message);
-
             // Ensure it's a system/server message
             if (event.isSystem()) {
-                String lowerCaseMessage = message.toLowerCase();
-
-                // Check for trigger phrases
-                if (lowerCaseMessage.contains("welcome")) {
+                // Check for a match with the welcome pattern
+                Matcher welcomeMatcher = WELCOME_PATTERN.matcher(message.toLowerCase());
+                if (welcomeMatcher.matches()) {
+                    String playerName = welcomeMatcher.group(1);
                     scheduleResponse(() -> sendMessage("Welcome!"));
-                } else if (lowerCaseMessage.contains("reached")) {
+                    return;
+                }
+
+                // Check for a match with the rank pattern
+                Matcher rankMatcher = RANK_PATTERN.matcher(message.toLowerCase());
+                if (rankMatcher.matches()) {
+                    String playerName = rankMatcher.group(1);
+                    String rank = rankMatcher.group(2);
                     scheduleResponse(() -> sendMessage("GG!"));
                 }
             }
@@ -75,19 +67,10 @@ public class WelcomeGG {
         private static void sendMessage(String message) {
             Minecraft mc = Minecraft.getInstance();
             if (mc.player != null) {
-                mc.player.sendSystemMessage(Component.literal(message));
-                LOGGER.info("Sent message: {}", message); // Log the sent message
+                mc.player.connection.sendChat(message); // Send the message to the server chat
+                LOGGER.info("Sent chat message: {}", message); // Log the sent message
             } else {
                 LOGGER.warn("Player instance is null. Unable to send message.");
-            }
-        }
-
-        private static void saveMessageToFile(String message) {
-            try (BufferedWriter writer = new BufferedWriter(new FileWriter(LOG_FILE, true))) {
-                writer.write(message);
-                writer.newLine();
-            } catch (IOException e) {
-                LOGGER.error("Failed to write message to log file: ", e);
             }
         }
     }
