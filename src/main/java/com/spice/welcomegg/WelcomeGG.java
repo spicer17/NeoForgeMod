@@ -27,31 +27,31 @@ public class WelcomeGG {
 
     public static class ChatEventHandler {
 
-        // Define your regex pattern
-        private static final Pattern WELCOME_PATTERN = Pattern.compile("welcome (.+) to baconetworks!");
-        private static final Pattern RANK_PATTERN = Pattern.compile("(.+) has reached the rank of (.+)!");
+        // Define your regex patterns
+        private static final Pattern WELCOME_PATTERN = Pattern.compile("welcome ([a-zA-Z0-9_]+) to baconetworks", Pattern.CASE_INSENSITIVE);
+        private static final Pattern RANK_PATTERN = Pattern.compile("([a-zA-Z0-9_]+) has reached the rank of ([a-zA-Z0-9_]+)", Pattern.CASE_INSENSITIVE);
 
         @SubscribeEvent
         public void onChatMessage(ClientChatReceivedEvent event) {
-            // Log the received message
-            String message = event.getMessage().getString();
-            LOGGER.info("Chat event received: {}", message);
+            // Get the raw message
+            String rawMessage = event.getMessage().getString();
+
+            // Clean the message
+            String cleanedMessage = cleanMessage(rawMessage);
+            LOGGER.info("Cleaned chat message: {}", cleanedMessage);
 
             // Ensure it's a system/server message
             if (event.isSystem()) {
                 // Check for a match with the welcome pattern
-                Matcher welcomeMatcher = WELCOME_PATTERN.matcher(message.toLowerCase());
+                Matcher welcomeMatcher = WELCOME_PATTERN.matcher(cleanedMessage);
                 if (welcomeMatcher.matches()) {
-                    String playerName = welcomeMatcher.group(1);
                     scheduleResponse(() -> sendMessage("Welcome!"));
                     return;
                 }
 
                 // Check for a match with the rank pattern
-                Matcher rankMatcher = RANK_PATTERN.matcher(message.toLowerCase());
+                Matcher rankMatcher = RANK_PATTERN.matcher(cleanedMessage);
                 if (rankMatcher.matches()) {
-                    String playerName = rankMatcher.group(1);
-                    String rank = rankMatcher.group(2);
                     scheduleResponse(() -> sendMessage("GG!"));
                 }
             }
@@ -67,11 +67,16 @@ public class WelcomeGG {
         private static void sendMessage(String message) {
             Minecraft mc = Minecraft.getInstance();
             if (mc.player != null) {
-                mc.player.connection.sendChat(message); // Send the message to the server chat
-                LOGGER.info("Sent chat message: {}", message); // Log the sent message
+                mc.player.sendSystemMessage(Component.literal(message));
+                LOGGER.info("Sent message: {}", message); // Log the sent message
             } else {
                 LOGGER.warn("Player instance is null. Unable to send message.");
             }
+        }
+
+        private static String cleanMessage(String message) {
+            // Remove any Minecraft color codes or special characters
+            return message.replaceAll("\\u00A7[0-9a-fk-or]", "").replaceAll("[^a-zA-Z0-9_ ]", "").toLowerCase();
         }
     }
 }
